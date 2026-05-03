@@ -14,6 +14,41 @@ from utils.models import *
 from .qobuz_api import Qobuz
 
 
+def _qobuz_display_artist_names(track_data: dict, album_data: dict) -> list:
+    """Ordered names for folder/display: main performer plus MainArtist/FeaturedArtist/Artist credits."""
+    main_artist = track_data.get('performer') or (album_data.get('artist') if isinstance(album_data, dict) else None)
+    if not main_artist:
+        main_artist = {'name': 'Unknown Artist', 'id': ''}
+    artists = [
+        unicodedata.normalize('NFKD', main_artist['name'])
+        .encode('ascii', 'ignore')
+        .decode('utf-8')
+    ]
+    role_mapping = {
+        'Lyricist': 'Lyricist',
+        'Lyricists': 'Lyricist',
+        'Vocals': 'Lyricist',
+        'Composer': 'Composer',
+        'Composers': 'Composer',
+        'Producer': 'Producer',
+        'Producers': 'Producer'
+    }
+    if track_data.get('performers'):
+        for credit in track_data['performers'].split(' - '):
+            try:
+                contributor_role = [role_mapping.get(r, r) for r in credit.split(', ')[1:]]
+                contributor_name = credit.split(', ')[0]
+            except (IndexError, ValueError):
+                continue
+            for contributor in ('MainArtist', 'FeaturedArtist', 'Artist'):
+                if contributor in contributor_role:
+                    if contributor_name not in artists:
+                        artists.append(contributor_name)
+                    contributor_role.remove(contributor)
+    artists[0] = main_artist['name']
+    return artists
+
+
 module_information = ModuleInformation(
     service_name = 'Qobuz',
     module_supported_modes = ModuleModes.download | ModuleModes.credits,
@@ -470,13 +505,19 @@ class ModuleInterface:
         album_name = album_data.get('title').rstrip()
         album_name += f' ({album_data.get("version")})' if album_data.get("version") else ''
 
-        album_quality = self.quality_format.format(**quality_tags) if self.quality_format != '' else None
-        if sample_rate == 44.1 and (bit_depth == 16 or bit_depth == 24):
-            album_quality = None
-        else:
-            is_hi_res = (bit_depth == 24 and sample_rate >= 88.2) or (bit_depth > 24)
-            if album_quality and is_hi_res:
-                album_quality = f'🅷 HI-RES / {album_quality}'
+        album_quality = None
+        if (self.quality_format or '').strip():
+            album_quality = self.quality_format.format(**quality_tags)
+
+        is_hi_res = (bit_depth == 24 and sample_rate >= 88.2) or (bit_depth > 24)
+        if album_quality and is_hi_res:
+            # Avoid "/" so folder names are not split into subdirectories on Windows/macOS/Linux.
+            album_quality = f'🅷 HI-RES · {album_quality}'
+
+        album_artist_list = None
+        if tracks:
+            first = extra_kwargs[tracks[0]]
+            album_artist_list = _qobuz_display_artist_names(first, album_data)
 
         return AlbumInfo(
             name = album_name,
@@ -492,6 +533,7 @@ class ModuleInterface:
             upc = album_data.get('upc'),
             duration = album_data.get('duration'),
             booklet_url = booklet_url,
+            album_artist = album_artist_list,
             track_extra_kwargs = {'data': extra_kwargs}
         )
 
