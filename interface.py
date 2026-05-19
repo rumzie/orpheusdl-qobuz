@@ -348,14 +348,14 @@ class ModuleInterface:
             for credit in track_data['performers'].split(' - '):
                 contributor_role = [role_mapping.get(r, r) for r in credit.split(', ')[1:]]
                 contributor_name = credit.split(', ')[0]
-                for contributor in ['MainArtist', 'FeaturedArtist', 'Artist']:
+                for contributor in ['MainArtist', 'FeaturedArtist', 'Artist', 'Performer']:
                     if contributor in contributor_role:
                         if contributor_name not in artists:
-                            artists.append(contributor_name)
+                            artists.append(contributor_name.strip())
                         contributor_role.remove(contributor)
                 if not contributor_role:
                     continue
-                performers.append(f"{contributor_name}, {', '.join(contributor_role)}")
+                performers.append(f"{contributor_name.strip()}, {', '.join(contributor_role)}")
             track_data = dict(track_data)
             track_data['performers'] = ' - '.join(performers)
         artists[0] = main_artist['name']
@@ -363,8 +363,21 @@ class ModuleInterface:
         # Extract the primary album artist name.
         album_artist = album_data.get('artist', {}).get('name', '') if isinstance(album_data.get('artist'), dict) else ''
 
+        album_artist_list = []
+
+        for album_artist in track_data['album']['artists']:
+            album_artist_list.append(album_artist['name'].strip())
+        # for album_artist in track_data['album']['artists']:
+        #     if 'main-artist' in album_artist['roles']:
+        #         album_artist_list.append(album_artist['name'].strip())
+
+        # for album_artist in track_data['album']['artists']:
+        #     if 'featured-artist' in album_artist['roles']:
+        #         album_artist_list.append(album_artist['name'].strip())
+
         tags = Tags(
-            album_artist = album_artist,
+            album_artist = album_data.get('artist', {}).get('name', '') if isinstance(album_data.get('artist'), dict) else '',
+            album_artists = album_artist_list if album_artist_list else (album_data.get('artist', {}).get('name', '') if isinstance(album_data.get('artist'), dict) else ''),
             composer = track_data.get('composer', {}).get('name') if isinstance(track_data.get('composer'), dict) else None,
             release_date = album_data.get('release_date_original'),
             track_number = track_data.get('track_number'),
