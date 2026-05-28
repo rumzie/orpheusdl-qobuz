@@ -496,6 +496,7 @@ class ModuleInterface:
                 pass
 
         tracks, extra_kwargs = [], {}
+        tracks_count = album_data.get('tracks_count')
         for track in album_data.pop('tracks')['items']:
             track_id = str(track['id'])
             tracks.append(track_id)
@@ -547,7 +548,8 @@ class ModuleInterface:
             duration = album_data.get('duration'),
             booklet_url = booklet_url,
             album_artist = album_artist_list,
-            track_extra_kwargs = {'data': extra_kwargs}
+            track_extra_kwargs = {'data': extra_kwargs},
+            expected_track_count=int(tracks_count) if tracks_count is not None else None,
         )
 
     def get_playlist_info(self, playlist_id):
@@ -596,6 +598,7 @@ class ModuleInterface:
             description = playlist_data.get('description'),
             duration = playlist_data.get('duration'),
             tracks = tracks,
+            num_tracks_from_api=int(total_tracks) if total_tracks is not None else None,
             track_extra_kwargs = {'data': extra_kwargs}
         )
 
